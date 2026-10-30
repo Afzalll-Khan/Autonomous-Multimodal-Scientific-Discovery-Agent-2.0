@@ -1,0 +1,40 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# Virtual enviroments
+.venv/
+venv/
+env/
+
+# Enviroment variables and secrets
+
+.env
+.env.*
+!.env,example
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Generated data
+data/raw/
+data/processed/
+data/vector_store/
+
+# OS files
+.DS_Store
+Thumbs.db
