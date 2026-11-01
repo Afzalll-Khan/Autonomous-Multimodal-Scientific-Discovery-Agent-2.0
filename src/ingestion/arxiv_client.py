@@ -1,17 +1,19 @@
 import requests
 import xml.etree.ElementTree as ET
+import json
+from pathlib import Path
 
 ARXIV_API_URL = "https://export.arxiv.org/api/query"
 
 ATOM_NAMESPACE = {"atom": "http://www.w3.org/2005/Atom"}
 
 
-def search_papers(query, maxx_results=5):
+def search_papers(query, max_results=5):
 
     params = {
         "search_query": f"all:{query}",
         "start": 0,
-        "max_results": maxx_results,
+        "max_results": max_results,
         "sortBy": "relevance",
         "sortOrder": "descending",
     }
@@ -50,7 +52,7 @@ def search_papers(query, maxx_results=5):
 
 
 if __name__ == "__main__":
-    results = search_papers(query="machine learning", maxx_results=5)
+    results = search_papers(query="machine learning", max_results=5)
 
     for index, paper in enumerate(results, start=1):
         print(f"\nPaper {index}")
@@ -61,3 +63,35 @@ if __name__ == "__main__":
         print("Published:", paper["published"])
         print("arXiv:", paper["arxiv_url"])
         print("Abstract:", paper["abstract"][:300], "...")
+
+
+def save_papers(papers):
+    project_root = Path(__file__).resolve().parents[2]
+
+    output_dir = project_root / "data" / "raw"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_file = output_dir / "papers.json"
+
+    with open(output_file, "w", encoding="utf-8") as file:
+        json.dump(papers, file, indent=4, ensure_ascii=False)
+
+    print(f"\nSuccessfully saved {len(papers)} papers.")
+    print(f"File location: {output_file}")
+
+
+if __name__ == "__main__":
+    results = search_papers(query="machine learning", max_results=5)
+
+    for index, paper in enumerate(results, start=1):
+        print(f"\nPaper {index}")
+        print("-" * 60)
+
+        print("Title:", paper["title"])
+        print("Authors:", ", ".join(paper["authors"]))
+        print("Published:", paper["published"])
+        print("arXiv:", paper["arxiv_url"])
+        print("Abstract:", paper["abstract"][:300], "...")
+
+    save_papers(results)

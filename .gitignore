@@ -38,3 +38,8 @@ data/vector_store/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated research data
+data/raw/
+data/processed/
+data/vector_store/
