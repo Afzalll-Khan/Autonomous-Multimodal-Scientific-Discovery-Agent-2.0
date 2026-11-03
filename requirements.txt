@@ -1,2 +1,4 @@
 requests
 pymupdf
+sentence-transformers
+numpy
