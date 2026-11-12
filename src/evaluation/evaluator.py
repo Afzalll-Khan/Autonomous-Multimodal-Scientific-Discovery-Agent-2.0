@@ -4,6 +4,7 @@ Coordinates single-sample and batch evaluations with strict input validation,
 isolated metric error handling, prominent individual metric reporting, and
 faithfulness gating to prevent high aggregate scores from hiding hallucinations.
 """
+
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -16,7 +17,6 @@ try:
         SourceAttributionMetric,
     )
 except ModuleNotFoundError:
-    # Fallback when running evaluator.py directly as a standalone script
     ROOT_DIR = Path(__file__).resolve().parents[2]
     if str(ROOT_DIR) not in sys.path:
         sys.path.insert(0, str(ROOT_DIR))
@@ -26,6 +26,7 @@ except ModuleNotFoundError:
         ContextRelevanceMetric,
         SourceAttributionMetric,
     )
+
 
 class RAGEvaluator:
     """Orchestrates RAG pipeline evaluation suites with strict validation and safety gates."""
@@ -86,10 +87,6 @@ class RAGEvaluator:
     ) -> Dict[str, Any]:
         """
         Evaluates a single RAG generation sample across all core evaluation dimensions.
-
-        Returns:
-            Dict[str, Any]: Prominent top-level scores, detailed metric diagnostics,
-                            validation flags, and a faithfulness-gated aggregate score.
         """
         self._validate_inputs(
             query=query,
@@ -129,23 +126,19 @@ class RAGEvaluator:
             round(sum(valid_scores) / len(valid_scores), 4) if valid_scores else 0.0
         )
 
-        # Faithfulness guardrail: prevent a strong aggregate score from masking poor faithfulness
         faithfulness_score = metric_scores.get("answer_faithfulness")
         faithfulness_warning = False
 
         if faithfulness_score is None:
-            # If faithfulness failed to compute, cap aggregate to signal unverified grounding
             gated_aggregate = min(raw_aggregate, self.faithfulness_threshold)
             faithfulness_warning = True
         elif faithfulness_score < self.faithfulness_threshold:
-            # Cap aggregate score so it cannot exceed the poor faithfulness score
             gated_aggregate = min(raw_aggregate, faithfulness_score)
             faithfulness_warning = True
         else:
             gated_aggregate = raw_aggregate
 
         return {
-            # Prominent individual metric scores at the top level
             "scores": metric_scores,
             "aggregate_score": round(gated_aggregate, 4),
             "unadjusted_aggregate_score": raw_aggregate,
@@ -215,3 +208,65 @@ class RAGEvaluator:
             "faithfulness_flagged_samples": flagged_samples,
             "detailed_results": batch_results,
         }
+
+
+# =====================================================================
+# INLINE TESTING BLOCK
+# =====================================================================
+if __name__ == "__main__":
+    print("=" * 60)
+    print("RUNNING RAG EVALUATION INLINE TEST SUITE")
+    print("=" * 60)
+
+    evaluator = RAGEvaluator()
+
+    # 1. Standard Flow Test
+    print("\n[Test 1] Standard evaluation flow...")
+    sample_res = evaluator.evaluate_sample(
+        query="What is quantum entanglement?",
+        retrieved_contexts=[
+            "Quantum entanglement is a physical phenomenon where pairs of particles interact in ways such that the quantum state of each particle cannot be described independently (Source 1)."
+        ],
+        answer="Quantum entanglement describes linked particles whose states cannot be described independently (Source 1).",
+        sources=[{"id": "doc1", "paper_id": "P123", "page": 5}]
+    )
+    assert sample_res["aggregate_score"] > 0.8
+    print("  -> Passed. Aggregate Score:", sample_res["aggregate_score"])
+
+    # 2. Input Validation Test
+    print("\n[Test 2] Input validation (empty query)...")
+    try:
+        evaluator.evaluate_sample(query="", retrieved_contexts=["context"], answer="answer")
+        raise AssertionError("Should have raised ValueError")
+    except ValueError as e:
+        print("  -> Passed. Caught expected ValueError:", e)
+
+    # 3. Faithfulness Gating / Hallucination Check
+    print("\n[Test 3] Faithfulness gating on hallucination...")
+    hallucination_res = evaluator.evaluate_sample(
+        query="What is the capital of France?",
+        retrieved_contexts=["France is a country in Western Europe. Its official language is French."],
+        answer="The capital of France is Paris and currency is Euro.",
+        sources=[{"id": "doc1"}]
+    )
+    assert hallucination_res["faithfulness_warning"] is True
+    print("  -> Passed. Faithfulness warning flagged:", hallucination_res["faithfulness_warning"])
+    print("  -> Gated Aggregate Score:", hallucination_res["aggregate_score"])
+
+    # 4. Batch Evaluation Test
+    print("\n[Test 4] Batch evaluation suite...")
+    batch_summary = evaluator.evaluate_batch([
+        {
+            "query": "What is AI?",
+            "retrieved_contexts": ["Artificial Intelligence is machine simulation."],
+            "answer": "AI simulates human intelligence (Source 1).",
+            "sources": [{"id": "1", "paper_id": "AI-101"}]
+        }
+    ])
+    assert batch_summary["total_samples"] == 1
+    print("  -> Passed. Total samples evaluated:", batch_summary["total_samples"])
+    print("  -> Average Aggregate Score:", batch_summary["average_aggregate_score"])
+
+    print("\n" + "=" * 60)
+    print("ALL INLINE RAG EVALUATION TESTS PASSED SUCCESSFULLY!")
+    print("=" * 60)
